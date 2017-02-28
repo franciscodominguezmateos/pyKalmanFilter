@@ -137,6 +137,9 @@ class pyUnscentedKalmanFilter(object):
     def MeasurementLikelihood(self,Z):   
         P,logP=self.gauss(Z,self.Z_,self.Zcov)
         
+class ExtendedKalmanFilter(object):
+    pass
+
 class pyKalmanFilter(object):
     '''
     classdocs
