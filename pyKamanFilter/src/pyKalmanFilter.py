@@ -42,7 +42,7 @@ class pyUnscentedKalmanFilter(object):
             s_=self.processModel.eval(s)
             sigmaPts_.append(s_)
         return sigmaPts_
-    def projectMasurementModel(self,sigmaPts):
+    def projectMeasurementModel(self,sigmaPts):
         sigmaPts_=[]
         for s in sigmaPts:
             s_=self.measurementModel.eval(s)
@@ -199,9 +199,9 @@ class pyKalmanFilter(object):
         ZTran=self.ZTran
         ZNcov=self.ZNcov
         # Predict measurement Z_ from predicted state X_
-        Z_   = ZTran*X_
+        Zp   = ZTran*X_
         # Innovation = Actual measurement - Predicted measurement
-        Innov= Z - Z_
+        Innov= Z - Zp
         Zcov = ZTran*Xcov_*ZTran.T + ZNcov
         iZcov=inv(Zcov)
         # Kalman gains
@@ -210,7 +210,7 @@ class pyKalmanFilter(object):
         X    =X_+K*Innov
         Xcov =Xcov_-K*Zcov*K.T
         # set data
-        self.Z_=Z_
+        self.Z_=Zp
         self.Zcov=Zcov
         self.X   =X
         self.Xcov=Xcov
