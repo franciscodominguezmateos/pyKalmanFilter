@@ -329,7 +329,7 @@ class pyKalmanFilter(object):
         self.Z    =Zini # Measurement
         self.Z_   =Zini # Measurement prediction
         self.ZNcov=ZZ   # Measurement Noise covariance
-        self.Zcov =ZZ   # Measurement covariance
+        self.Zcov =ZZ   # Measurement covariance prediction
         self.ZTran=ZX   # Measurement transformation matrix
         # Temporal data
         self.Innov=Zini # Innovation
@@ -349,6 +349,19 @@ class pyKalmanFilter(object):
         self.X_=X_
         self.Xcov_=Xcov_
         return (X_,Xcov_)
+    def measurePrediction(self):
+        # get data
+        X_   =self.X_
+        Xcov_=self.Xcov_
+        ZTran=self.ZTran
+        ZNcov=self.ZNcov
+        # Predict measurement Z_ from predicted state X_
+        Z_   = ZTran*X_
+        Zcov = ZTran*Xcov_*ZTran.T + ZNcov
+        self.Z_=Z_
+        self.Zcov=Zcov
+        return (Z_,Zcov)
+        
     def update(self,Z):
         # get data
         Z=np.matrix(Z).T
@@ -357,12 +370,11 @@ class pyKalmanFilter(object):
         Xcov_=self.Xcov_
         ZTran=self.ZTran
         ZNcov=self.ZNcov
-        # Predict measurement Z_ from predicted state X_
-        Z_   = ZTran*X_
+        # Predict measurement Z from predicted state X_
+        Z_,Zcov=self.measurePrediction()
+        iZcov=inv(Zcov)
         # Innovation = Actual measurement - Predicted measurement
         Innov= Z - Z_
-        Zcov = ZTran*Xcov_*ZTran.T + ZNcov
-        iZcov=inv(Zcov)
         # Kalman gain
         K    = Xcov_*ZTran.T*iZcov
         # Update State
