@@ -3,6 +3,7 @@ Created on Feb 17, 2017
 
 @author: Francisco Dominguez
 '''
+from math import cos,sin,sqrt,atan2
 import numpy as np
 from numpy.linalg import inv,det
 from numpy import log,exp,pi
@@ -10,19 +11,72 @@ from numpy import log,exp,pi
 class VelocityProcessModel(object):
     def __init__(self):
         pass
-    def eval(self,s):
-        pass
-    def jacobian(self,x,u):
-        pass
+    def eval(self,X,u):
+        vt=u[0]
+        wt=u[1]
+        vw=vt/wt
+        x=X[0]
+        y=X[1]
+        theta=X[2]
+        dt=self.getDeltaTime()
+        dX0=-vw*sin(theta)+vw*sin(theta+wt*dt)
+        dX1= vw*cos(theta)-vw*cos(theta+wt*dt)
+        dX2=wt*dt
+        dX=np.matrix([[dX0],
+                      [dX1],
+                      [dX2]])
+        return X+dX
+    def jacobian(self,X,u):
+        vt=u[0]
+        wt=u[1]
+        vw=vt/wt
+        theta=X[2]
+        dt=self.getDeltaTime()
+        g02=-vw*cos(theta)+vw*cos(theta+wt*dt)
+        g12=-vw*sin(theta)+vw*sin(theta+wt*dt)
+        G=np.matrix([[1, 0, g02],
+                     [0, 1, g12],
+                     [0, 0,   1]])
+        return G
 class LandmarksMeasurementModel(object):
     def __init__(self):
-        self.m=None #map
+        self.m=[] #map
         
-        pass
-    def eval(self,s):
-        pass
-    def jacobian(self,x,u):
-        pass
+    def eval(self,X,Z,C):
+        j=C
+        mjx=self.m[j].x
+        mjy=self.m[j].y
+        x=X[0]
+        y=X[1]
+        theta=X[2]
+        dx=mjx-x
+        dy=mjy-y
+        dx2=dx*dx
+        dy2=dy*dy
+        d2=dx2+dy2
+        d =sqrt(d2)#distance from measure to landmark
+        Z_=np.matrix([[d],
+                      [atan2(dx,dy)-theta],
+                      [0]])
+        return Z
+    
+    def jacobian(self,X,Z,C):
+        j=C
+        mjx=self.m[j].x
+        mjy=self.m[j].y
+        x=X[0]
+        y=X[1]
+        theta=X[2]
+        dx=mjx-x
+        dy=mjy-y
+        dx2=dx*dx
+        dy2=dy*dy
+        d2=dx2+dy2
+        d =sqrt(d2)#distance from measure to landmark
+        H=np.matrix([[-dx/d ,-dy/d , 0],
+                     [ dy/d2,-dx/d2,-1],
+                     [     0,     0, 0]])
+        return H
     
 class pyUnscentedKalmanFilter(object):
     def getSigmaPoints(self,mean,cov):
@@ -125,7 +179,7 @@ class pyUnscentedKalmanFilter(object):
         ZNcov=self.ZNcov
         # Predict measurement Z_ from predicted state X_
         # project sigma points in time through measurement model
-        ZsigmaPts_=self.projectMasurementModel(XsigmaPts_)
+        ZsigmaPts_=self.projectMeasurementModel(XsigmaPts_)
         # estimate new mean and covariance from sigma predicted and noise cov
         Z_, Zcov= self.unscentedTransform(ZsigmaPts_, ZNcov)
         iZcov=inv(Zcov)
@@ -133,7 +187,7 @@ class pyUnscentedKalmanFilter(object):
         Innov= Z - Z_
         # estimate cross covariance from process X and measurement Z
         crossCov=self.getCrossCov()
-        # Kalman gains
+        # Kalman gain
         K    = crossCov*iZcov
         # Update State
         X    =X_+K*Innov
@@ -222,7 +276,7 @@ class pyExtendedKalmanFilter(object):
         Innov= Z - Z_
         Zcov = ZTran*Xcov_*ZTran.T + ZNcov
         iZcov=inv(Zcov)
-        # Kalman gains
+        # Kalman gain
         K    = Xcov_*ZTran.T*iZcov
         # Update State
         X    =X_+K*Innov
@@ -309,7 +363,7 @@ class pyKalmanFilter(object):
         Innov= Z - Z_
         Zcov = ZTran*Xcov_*ZTran.T + ZNcov
         iZcov=inv(Zcov)
-        # Kalman gains
+        # Kalman gain
         K    = Xcov_*ZTran.T*iZcov
         # Update State
         X    =X_+K*Innov
@@ -372,7 +426,7 @@ if __name__ == '__main__':
     kalman.XNcov = np.matrix(np.array([[1,0,0,0],
                                        [0,1,0,0],
                                        [0,0,1,0],
-                                       [0,0,0,1]],np.float32) * 0.01)
+                                       [0,0,0,1]],np.float32) * 1)
     kalman.ZNcov = np.matrix(np.array([[1,0],
                                        [0,1]],np.float32) * 5)
     while True:
