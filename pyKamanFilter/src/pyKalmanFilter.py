@@ -262,6 +262,20 @@ class pyExtendedKalmanFilter(object):
         self.X_=X_
         self.Xcov_=Xcov_
         return (X_,Xcov_)
+
+    def measurePrediction(self):
+        # get data
+        X_   =self.X_
+        Xcov_=self.Xcov_
+        ZTran=self.measurementModel.jacobian(X_)
+        ZNcov=self.ZNcov
+        # Predict measurement Z_ from predicted state X_
+        Z_   = self.measurementModel.eval(X_)
+        Zcov = ZTran*Xcov_*ZTran.T + ZNcov
+        self.Z_=Z_
+        self.Zcov=Zcov
+        return (Z_,Zcov)
+        
     def update(self,Z):
         # get data
         Z=np.matrix(Z).T
@@ -270,12 +284,11 @@ class pyExtendedKalmanFilter(object):
         Xcov_=self.Xcov_
         ZTran=self.measurementModel.jacobian(X_)
         ZNcov=self.ZNcov
-        # Predict measurement Z_ from predicted state X_
-        Z_   = self.measurementModel.eval(X_)
+        # Predict measurement Z from predicted state X_
+        Z_,Zcov=self.measurePrediction()
+        iZcov=inv(Zcov)
         # Innovation = Actual measurement - Predicted measurement
         Innov= Z - Z_
-        Zcov = ZTran*Xcov_*ZTran.T + ZNcov
-        iZcov=inv(Zcov)
         # Kalman gain
         K    = Xcov_*ZTran.T*iZcov
         # Update State
@@ -287,6 +300,7 @@ class pyExtendedKalmanFilter(object):
         self.X   =X
         self.Xcov=Xcov
         return (X,Xcov)
+    
     def gauss(self,X,Xmean,Xcov):
         Xdim = Xmean.shape[0]
         Xdif = X-Xmean
@@ -386,6 +400,7 @@ class pyKalmanFilter(object):
         self.X   =X
         self.Xcov=Xcov
         return (X,Xcov)
+    
     def gauss(self,X,Xmean,Xcov):
         Xdim = Xmean.shape[0]
         Xdif = X-Xmean
