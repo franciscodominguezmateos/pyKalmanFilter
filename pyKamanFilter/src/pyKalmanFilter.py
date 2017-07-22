@@ -7,6 +7,23 @@ import numpy as np
 from numpy.linalg import inv,det
 from numpy import log,exp,pi
 
+class VelocityProcessModel(object):
+    def __init__(self):
+        pass
+    def eval(self,s):
+        pass
+    def jacobian(self,x,u):
+        pass
+class LandmarksMeasurementModel(object):
+    def __init__(self):
+        self.m=None #map
+        
+        pass
+    def eval(self,s):
+        pass
+    def jacobian(self,x,u):
+        pass
+    
 class pyUnscentedKalmanFilter(object):
     def getSigmaPoints(self,mean,cov):
         sigmaPts=[]
@@ -63,6 +80,8 @@ class pyUnscentedKalmanFilter(object):
         pass
         
     def __init__(self,Xdim,Zdim):
+        self.processModel=None
+        self.measurementModel=None
         pass
     def setParameters(self,a,b,k):
         n=self.Xcov.shape[1]+1
@@ -137,8 +156,94 @@ class pyUnscentedKalmanFilter(object):
     def MeasurementLikelihood(self,Z):   
         P,logP=self.gauss(Z,self.Z_,self.Zcov)
         
-class ExtendedKalmanFilter(object):
-    pass
+class pyExtendedKalmanFilter(object):
+    '''
+    classdocs
+    '''
+    def __init__(self, Xdim,Zdim):
+        '''
+        Constructor
+        '''
+        self.processModel=None
+        self.measurementModel=None
+        self.Xdim=Xdim
+        self.Zdim=Zdim
+        # State data
+        Xini =np.matrix(np.zeros(Xdim)).T
+        Uini =np.matrix(np.zeros(Xdim)).T#It doesn't have to be same size
+        Zini =np.matrix(np.zeros(Zdim)).T
+        XX=np.matrix(np.eye(Xdim,Xdim))
+        ZX=np.matrix(np.eye(Zdim,Xdim))
+        ZZ=np.matrix(np.eye(Zdim,Zdim))
+        
+        self.X    =Xini # State
+        self.XNcov=XX   # State Noise covariance
+        self.Xcov =XX   # State covariance
+        self.X_   =Xini # State prediction
+        self.Xcov_=XX   # State covariance prediction
+        self.XTran=XX   # State transformation/transition Matrix/In EKF is Jacobian
+        self.U    =Uini # Control
+        self.UTran=XX   # Control transformation matrix/In EKF is Jacobian
+        # Measurement data
+        self.Z    =Zini # Measurement
+        self.Z_   =Zini # Measurement prediction
+        self.ZNcov=ZZ   # Measurement Noise covariance
+        self.Zcov =ZZ   # Measurement covariance
+        self.ZTran=ZX   # Measurement transformation matrix/In EKF is Jacobian
+        # Temporal data
+        self.Innov=Zini # Innovation
+    def predict(self,U=np.matrix('0,0,0,0')):
+        U=np.matrix(U).T
+        self.U=U
+        # get data
+        UTran=self.UTran
+        X    =self.processModel.eval(self.X,U)
+        XTran=self.processModel.jacobian(X,U)
+        XNcov=self.XNcov
+        Xcov =self.Xcov
+        # Prediction
+        X_   = XTran*X + UTran*U
+        Xcov_= XTran*Xcov*XTran.T + XNcov
+        # set data
+        self.X_=X_
+        self.Xcov_=Xcov_
+        return (X_,Xcov_)
+    def update(self,Z):
+        # get data
+        Z=np.matrix(Z).T
+        self.Z=Z
+        X_   =self.X_
+        Xcov_=self.Xcov_
+        ZTran=self.measurementModel.jacobian(X_)
+        ZNcov=self.ZNcov
+        # Predict measurement Z_ from predicted state X_
+        Z_   = self.measurementModel.eval(X_)
+        # Innovation = Actual measurement - Predicted measurement
+        Innov= Z - Z_
+        Zcov = ZTran*Xcov_*ZTran.T + ZNcov
+        iZcov=inv(Zcov)
+        # Kalman gains
+        K    = Xcov_*ZTran.T*iZcov
+        # Update State
+        X    =X_+K*Innov
+        Xcov =Xcov_-K*Zcov*K.T
+        # set data
+        self.Z_=Z_
+        self.Zcov=Zcov
+        self.X   =X
+        self.Xcov=Xcov
+        return (X,Xcov)
+    def gauss(self,X,Xmean,Xcov):
+        Xdim = Xmean.shape[0]
+        Xdif = X-Xmean
+        XdifT=Xdif.transpose()
+        iXcov=inv(Xcov)
+        E    = 0.5 * XdifT * iXcov * Xdif
+        logP = E + 0.5 * Xdim * log(2*pi) + 0.5*log(det(Xcov))
+        P=exp(-logP)
+        return (P[0],logP[0])
+    def MeasurementLikelihood(self,Z):   
+        P,logP=self.gauss(Z,self.Z_,self.Zcov)
 
 class pyKalmanFilter(object):
     '''
@@ -199,9 +304,9 @@ class pyKalmanFilter(object):
         ZTran=self.ZTran
         ZNcov=self.ZNcov
         # Predict measurement Z_ from predicted state X_
-        Zp   = ZTran*X_
+        Z_   = ZTran*X_
         # Innovation = Actual measurement - Predicted measurement
-        Innov= Z - Zp
+        Innov= Z - Z_
         Zcov = ZTran*Xcov_*ZTran.T + ZNcov
         iZcov=inv(Zcov)
         # Kalman gains
@@ -210,7 +315,7 @@ class pyKalmanFilter(object):
         X    =X_+K*Innov
         Xcov =Xcov_-K*Zcov*K.T
         # set data
-        self.Z_=Zp
+        self.Z_=Z_
         self.Zcov=Zcov
         self.X   =X
         self.Xcov=Xcov
