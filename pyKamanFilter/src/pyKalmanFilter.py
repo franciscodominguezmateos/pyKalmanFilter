@@ -11,71 +11,77 @@ from numpy import log,exp,pi
 class VelocityProcessModel(object):
     def __init__(self):
         pass
+    def getDeltaTime(self):
+        return 0.1
     def eval(self,X,u):
-        vt=u[0]
-        wt=u[1]
+        vt=u[0,0]
+        wt=u[1,0]
         vw=vt/wt
-        x=X[0]
-        y=X[1]
-        theta=X[2]
+        x=X[0,0]
+        y=X[1,0]
+        theta=X[2,0]
         dt=self.getDeltaTime()
         dX0=-vw*sin(theta)+vw*sin(theta+wt*dt)
         dX1= vw*cos(theta)-vw*cos(theta+wt*dt)
         dX2=wt*dt
-        dX=np.matrix([[dX0],
+        dX=np.matrix(np.array(
+                     [[dX0],
                       [dX1],
-                      [dX2]])
+                      [dX2]]))
         return X+dX
     def jacobian(self,X,u):
-        vt=u[0]
-        wt=u[1]
+        vt=u[0,0]
+        wt=u[1,0]
         vw=vt/wt
-        theta=X[2]
+        theta=X[2,0]
         dt=self.getDeltaTime()
         g02=-vw*cos(theta)+vw*cos(theta+wt*dt)
         g12=-vw*sin(theta)+vw*sin(theta+wt*dt)
-        G=np.matrix([[1, 0, g02],
+        G=np.matrix(np.array(
+                     [[1, 0, g02],
                      [0, 1, g12],
-                     [0, 0,   1]])
+                     [0, 0,   1]]))
         return G
 class LandmarksMeasurementModel(object):
     def __init__(self):
-        self.m=[] #map
+        self.m=[] #map is a list
         
-    def eval(self,X,Z,C):
+    def eval(self,X,C):
         j=C
         mjx=self.m[j].x
         mjy=self.m[j].y
-        x=X[0]
-        y=X[1]
-        theta=X[2]
+        x=X[0,0]
+        y=X[1,0]
+        theta=X[2,0]
         dx=mjx-x
         dy=mjy-y
         dx2=dx*dx
         dy2=dy*dy
         d2=dx2+dy2
-        d =sqrt(d2)#distance from measure to landmark
-        Z_=np.matrix([[d],
+        d =sqrt(d2)#distance from object/robot to landmark
+        Z_=np.matrix(np.array(
+                     [[d],
                       [atan2(dx,dy)-theta],
-                      [0]])
+                      [0]]))
         return Z
     
     def jacobian(self,X,Z,C):
         j=C
         mjx=self.m[j].x
         mjy=self.m[j].y
-        x=X[0]
-        y=X[1]
-        theta=X[2]
+        x=X[0,0]
+        y=X[1,0]
+        theta=X[2,0]
         dx=mjx-x
         dy=mjy-y
         dx2=dx*dx
         dy2=dy*dy
         d2=dx2+dy2
         d =sqrt(d2)#distance from measure to landmark
-        H=np.matrix([[-dx/d ,-dy/d , 0],
+        H=np.matrix(np.array(
+                    [[-dx/d ,-dy/d , 0],
                      [ dy/d2,-dx/d2,-1],
-                     [     0,     0, 0]])
+                     [     0,     0, 0]]))
         return H
     
 class pyUnscentedKalmanFilter(object):
@@ -114,11 +120,11 @@ class pyUnscentedKalmanFilter(object):
             sigmaPts_.append(s_)
         return sigmaPts_
     def projectMeasurementModel(self,sigmaPts):
-        sigmaPts_=[]
+        zPts_=[]
         for s in sigmaPts:
             s_=self.measurementModel.eval(s)
-            sigmaPts_.append(s_)
-        return sigmaPts_
+            zPts_.append(s_)
+        return zPts_
     def unscentedTransform(self,sigmaPts_,noiseCov):
         dim=sigmaPts_[0].shape[0]
         # mean estimation
@@ -246,6 +252,7 @@ class pyExtendedKalmanFilter(object):
         self.ZTran=ZX   # Measurement transformation matrix/In EKF is Jacobian
         # Temporal data
         self.Innov=Zini # Innovation
+        
     def predict(self,U=np.matrix('0,0,0,0')):
         U=np.matrix(U).T
         self.U=U
@@ -274,7 +281,7 @@ class pyExtendedKalmanFilter(object):
         Zcov = ZTran*Xcov_*ZTran.T + ZNcov
         self.Z_=Z_
         self.Zcov=Zcov
-        return (Z_,Zcov)
+        return (Z_,Zcov ,ZTran)
         
     def update(self,Z):
         # get data
@@ -282,10 +289,9 @@ class pyExtendedKalmanFilter(object):
         self.Z=Z
         X_   =self.X_
         Xcov_=self.Xcov_
-        ZTran=self.measurementModel.jacobian(X_)
         ZNcov=self.ZNcov
         # Predict measurement Z from predicted state X_
-        Z_,Zcov=self.measurePrediction()
+        Z_,Zcov,ZTran=self.measurePrediction()
         iZcov=inv(Zcov)
         # Innovation = Actual measurement - Predicted measurement
         Innov= Z - Z_
@@ -310,6 +316,7 @@ class pyExtendedKalmanFilter(object):
         logP = E + 0.5 * Xdim * log(2*pi) + 0.5*log(det(Xcov))
         P=exp(-logP)
         return (P[0],logP[0])
+    
     def MeasurementLikelihood(self,Z):   
         P,logP=self.gauss(Z,self.Z_,self.Zcov)
 
