@@ -10,9 +10,11 @@ from numpy import log,exp,pi
 
 class VelocityProcessModel(object):
     def __init__(self):
-        pass
+        self.dt=0.1
     def getDeltaTime(self):
-        return 0.1
+        return self.dt
+    def getDim(self):
+        return 3
     def eval(self,X,u):
         vt=u[0,0]
         wt=u[1,0]
@@ -48,6 +50,8 @@ class LandmarksMeasurementModel(object):
         self.C=0 # correspondence problem dependent variable
     def setC(self,C):
         self.C=C
+    def getDim(self):
+        return 3
     def eval(self,X):
         j=self.C
         mjx=self.m[j][0]#x landmark pos
@@ -60,17 +64,20 @@ class LandmarksMeasurementModel(object):
         dx2=dx*dx
         dy2=dy*dy
         d2=dx2+dy2
-        d =sqrt(d2)#distance from object/robot to landmark
+        d =sqrt(d2) #distance from object/robot to landmark
+        th=atan2(dy,dx)-theta #angle from object/robot to landmark
+        #Normalize angle
+        pass
         Z_=np.matrix(np.array(
-                     [[d],
-                      [atan2(dx,dy)-theta],
-                      [0]]))
+                     [[ d],
+                      [th],
+                      [ 0]]))
         return Z_
     
     def jacobian(self,X):
         j=self.C
-        mjx=self.m[j].x
-        mjy=self.m[j].y
+        mjx=self.m[j][0]
+        mjy=self.m[j][1]
         x=X[0,0]
         y=X[1,0]
         theta=X[2,0]
@@ -222,12 +229,14 @@ class pyExtendedKalmanFilter(object):
     '''
     classdocs
     '''
-    def __init__(self, Xdim,Zdim):
+    def __init__(self, processModel, measurementModel):
         '''
         Constructor
         '''
-        self.processModel=None
-        self.measurementModel=None
+        self.processModel=processModel
+        self.measurementModel=measurementModel
+        Xdim=processModel.getDim()
+        Zdim=measurementModel.getDim()
         self.Xdim=Xdim
         self.Zdim=Zdim
         # State data
@@ -255,18 +264,18 @@ class pyExtendedKalmanFilter(object):
         # Temporal data
         self.Innov=Zini # Innovation
         
-    def predict(self,U=np.matrix('0,0,0,0')):
-        U=np.matrix(U).T
+    def predict(self,U=np.matrix('0,0,0,0').T):
+        #U=np.matrix(U).T
         self.U=U
         # get data
         UTran=self.UTran
-        X    =self.processModel.eval(self.X,U)
+        X=self.X
         XTran=self.processModel.jacobian(X,U)
         XNcov=self.XNcov
         Xcov =self.Xcov
         # Prediction
-        X_   = XTran*X + UTran*U
-        Xcov_= XTran*Xcov*XTran.T + XNcov
+        X_   = self.processModel.eval(X,U)
+        Xcov_= XTran*Xcov*XTran.T + XNcov # not noise model for U for now
         # set data
         self.X_=X_
         self.Xcov_=Xcov_
@@ -280,14 +289,15 @@ class pyExtendedKalmanFilter(object):
         ZNcov=self.ZNcov
         # Predict measurement Z_ from predicted state X_
         Z_   = self.measurementModel.eval(X_)
-        Zcov = ZTran*Xcov_*ZTran.T + ZNcov
+        Zcov = ZTran*Xcov_*ZTran.T 
+        Zcov+= ZNcov
         self.Z_=Z_
         self.Zcov=Zcov
         return (Z_,Zcov ,ZTran)
         
     def update(self,Z):
         # get data
-        Z=np.matrix(Z).T
+        #Z=np.matrix(Z).T
         self.Z=Z
         X_   =self.X_
         Xcov_=self.Xcov_
@@ -300,7 +310,8 @@ class pyExtendedKalmanFilter(object):
         # Kalman gain
         K    = Xcov_*ZTran.T*iZcov
         # Update State
-        X    =X_+K*Innov
+        correction=K*Innov
+        X    =X_+correction
         Xcov =Xcov_-K*Zcov*K.T
         # set data
         self.Z_=Z_
