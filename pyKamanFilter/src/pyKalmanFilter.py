@@ -94,17 +94,67 @@ class LandmarksMeasurementModel(object):
         return H
     
 class pyUnscentedKalmanFilter(object):
-    def getSigmaPoints(self,mean,cov):
+    def __init__(self, processModel, measurementModel):
+        '''
+        Constructor
+        '''
+        self.processModel=processModel
+        self.measurementModel=measurementModel
+        Xdim=processModel.getDim()
+        Zdim=measurementModel.getDim()
+        # State data
+        Xini =np.matrix(np.zeros(Xdim)).T
+        Uini =np.matrix(np.zeros(Xdim)).T#It doesn't have to be same size
+        Zini =np.matrix(np.zeros(Zdim)).T
+        XX=np.matrix(np.eye(Xdim,Xdim))
+        ZX=np.matrix(np.eye(Zdim,Xdim))
+        ZZ=np.matrix(np.eye(Zdim,Zdim))
+        
+        self.X    =Xini # State
+        self.XNcov=XX   # State Noise covariance
+        self.Xcov =XX   # State covariance
+        self.X_   =Xini # State prediction
+        self.Xcov_=XX   # State covariance prediction
+        self.XTran=XX   # State transformation/transition Matrix/In EKF is Jacobian
+        self.U    =Uini # Control
+        self.UTran=XX   # Control transformation matrix/In EKF is Jacobian
+        # Measurement data
+        self.Z    =Zini # Measurement
+        self.Z_   =Zini # Measurement prediction
+        self.ZNcov=ZZ   # Measurement Noise covariance
+        self.Zcov =ZZ   # Measurement covariance
+        self.ZTran=ZX   # Measurement transformation matrix/In EKF is Jacobian
+        # Temporal data
+        self.Innov=Zini # Innovation
+        self.setParameters()
+        self.setWeights(Xdim)
+    def setParameters(self,a=1,b=2,k=0.1):
+        n=self.Xcov.shape[1]+1
+        # alpha
+        self.a=a
+        # beta
+        self.b=b
+        # kapa
+        self.k=k
+        # lambda
+        self.l=a*a*(n+k)-n
+    def getSigmaPoints(self,mean,covIn):
+        cols=covIn.shape[1]
+        n=cols+1
         sigmaPts=[]
         # first sigma point is the mean
+        tmp=(n+self.l)*covIn
+        cov=np.linalg.cholesky(tmp)
         sigmaPts.append(mean)
-        cols=cov.shape[1]
-        n=cols+1
         for i in range(cols):
-            sigma=mean+np.sqrt((n+self.l)*cov[:,i])
+            c=cov[:,i]
+            print "c=",c
+            sigma=mean+c
             sigmaPts.append(sigma)
-            sigma=mean-np.sqrt((n+self.l)*cov[:,i])
+            sigma=mean-c
             sigmaPts.append(sigma)
+        for sp in sigmaPts:
+            print sp
         return sigmaPts
     def setWeights(self,n):
         self.wm=[]
@@ -122,10 +172,10 @@ class pyUnscentedKalmanFilter(object):
             w=1/(2*(n+l))
             self.wm.append(w)
             self.wc.append(w)
-    def projectProcessModel(self,sigmaPts):
+    def projectProcessModel(self,sigmaPts,U):
         sigmaPts_=[]
         for s in sigmaPts:
-            s_=self.processModel.eval(s)
+            s_=self.processModel.eval(s,U)
             sigmaPts_.append(s_)
         return sigmaPts_
     def projectMeasurementModel(self,sigmaPts):
@@ -134,36 +184,35 @@ class pyUnscentedKalmanFilter(object):
             s_=self.measurementModel.eval(s)
             zPts_.append(s_)
         return zPts_
-    def unscentedTransform(self,sigmaPts_,noiseCov):
+    def getMoments(self,sigmaPts_,noiseCov):
         dim=sigmaPts_[0].shape[0]
         # mean estimation
         M_=np.matrix(np.zeros(dim)).T
         for w,s in zip(self.wm,sigmaPts_):
+            print s
             M_+=w*s
         # covariance estimation
         cov_=noiseCov
         for w,s in zip(self.wc,sigmaPts_):
-            cov_+=w*(s-M_)(s-M_).T
+            cov_+=w*(s-M_)*(s-M_).T
+        print M_,cov_
         return M_,cov_
-    def getCrossCov(self):
-        pass
-        
-    def __init__(self,Xdim,Zdim):
-        self.processModel=None
-        self.measurementModel=None
-        pass
-    def setParameters(self,a,b,k):
-        n=self.Xcov.shape[1]+1
-        # alpha
-        self.a=a
-        # beta
-        self.b=b
-        # kapa
-        self.k=k
-        # lambda
-        self.l=a*a*(n+k)-n
-    def predict(self,U=np.matrix('0,0,0,0')):
-        U=np.matrix(U).T
+    def getCrossCov(self,XsigmaPts,X_,ZsigmaPts,Z_):
+        dimX=X_.shape[0]
+        dimZ=Z_.shape[0]
+        cov=np.matrix(np.zeros((dimX,dimZ)))
+        print cov.shape
+        for w,x,z in zip(self.wc,XsigmaPts,ZsigmaPts):
+            print x.shape
+            print z.T.shape
+            dX=x-X_
+            dZ=z-Z_
+            print dX.shape
+            print dZ.T.shape
+            cov+=w*dX*dZ.T
+        return cov
+    def predict(self,U=np.matrix('0,0,0,0').T):
+        #U=np.matrix(U).T
         self.U=U
         # get data
         UTran=self.UTran
@@ -175,9 +224,9 @@ class pyUnscentedKalmanFilter(object):
         sigmaPts=self.getSigmaPoints(X,Xcov)
         # project points in time with process model
         # new predicted sigma points
-        sigmaPts_=self.projectProcessModel(sigmaPts)
+        sigmaPts_=self.projectProcessModel(sigmaPts,U)
         # estimate new mean and covariance from sigma predicted and noise cov
-        X_,Xcov_=self.unscentedTransform(sigmaPts_, XNcov)
+        X_,Xcov_=self.getMoments(sigmaPts_, XNcov)
         # set data
         self.X_=X_
         self.Xcov_=Xcov_
@@ -186,27 +235,33 @@ class pyUnscentedKalmanFilter(object):
         return (X_,Xcov_)
     def update(self,Z):
         # get data
-        Z=np.matrix(Z).T
+        #Z=np.matrix(Z).T
         self.Z=Z
         X_   =self.X_
         Xcov_=self.Xcov_
-        XsigmaPts_=self.XsigmaPts_
+        XsigmaPts_=self.getSigmaPoints(X_,Xcov_)
         ZNcov=self.ZNcov
         # Predict measurement Z_ from predicted state X_
         # project sigma points in time through measurement model
         ZsigmaPts_=self.projectMeasurementModel(XsigmaPts_)
         # estimate new mean and covariance from sigma predicted and noise cov
-        Z_, Zcov= self.unscentedTransform(ZsigmaPts_, ZNcov)
+        Z_, Zcov= self.getMoments(ZsigmaPts_, ZNcov)
         iZcov=inv(Zcov)
         # Innovation = Actual measurement - Predicted measurement
         Innov= Z - Z_
         # estimate cross covariance from process X and measurement Z
-        crossCov=self.getCrossCov()
+        crossCov=self.getCrossCov(XsigmaPts_,X_,ZsigmaPts_,Z_)
         # Kalman gain
+        print iZcov
+        print crossCov
         K    = crossCov*iZcov
         # Update State
+        print "K=",K
+        print "X=",X_
         X    =X_+K*Innov
         Xcov =Xcov_-K*Zcov*K.T
+        print "X=",X
+        print "Xcov=",Xcov
         # set data
         self.Z_=Z_
         self.Zcov=Zcov
