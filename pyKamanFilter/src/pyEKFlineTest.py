@@ -60,7 +60,7 @@ if __name__ == '__main__':
     vpm.dt=1
     X=np.matrix([0.0,0.0,0.0]).T
     u=np.matrix([1.0,0.11]).T
-    lmm=kf.LandmarkMeasurementModel()
+    lmm=kf.LineMeasurementModel()
     map=[]
     map.append(np.array([ 10, 0.0]))
     map.append(np.array([ 10, PI/2.0]))
@@ -94,9 +94,8 @@ if __name__ == '__main__':
     #kalman.Zcov = np.matrix(np.array([[1,0,0],
     #                                   [0,1,0],
     #                                   [0,0,1]],np.float32) * 0.0525)
-    kalman.ZNcov = np.matrix(np.array([[1,0,0],
-                                       [0,1,0],
-                                       [0,0,1]],np.float32) * 0.01525)
+    kalman.ZNcov = np.matrix(np.array([[1,0],
+                                       [0,1]],np.float32) * 0.01525)
     for j in range(STEPS):
         X,Xcov=kalman.predict(u)
         cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.2, color='green')
@@ -112,7 +111,7 @@ if __name__ == '__main__':
             lmm.setC(i)#observe landmark 0
             zd=lmm.eval(X)
             #z=zd
-            z=np.matrix(np.array([zd[0,0]+np.random.randn(1)[0]*0.01525,zd[1,0]+np.random.randn(1)[0]*0.01525,0])).T
+            z=np.matrix(np.array([zd[0,0]+np.random.randn(1)[0]*0.01525,zd[1,0]+np.random.randn(1)[0]*0.01525])).T
             x,y=getGlobalLine(X,z)
             #plt.plot([x], [y], 'b*')
             #plt.plot([x,X[0,0]],[y,X[1,0]],"g",alpha=0.2)

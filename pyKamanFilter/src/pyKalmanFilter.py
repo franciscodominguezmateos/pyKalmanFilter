@@ -129,17 +129,8 @@ class LineMeasurementModel(object):
         return Z_
     def jacobian(self,X):
         j=self.C
-        mjx=self.m[j][0]
-        mjy=self.m[j][1]
-        x=X[0,0]
-        y=X[1,0]
-        theta=X[2,0]
-        dx=mjx-x
-        dy=mjy-y
-        dx2=dx*dx
-        dy2=dy*dy
-        d2=dx2+dy2
-        d =sqrt(d2)#distance from measure to landmark
+        mjr=self.m[j][0]
+        mja=self.m[j][1]
         H=np.matrix(np.array(
                     [[ -cos(mja),-sin(mja),  0.0],
                      [      0.0 ,    0.0 , -1.0]]))
