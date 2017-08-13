@@ -14,6 +14,7 @@ def getLandmark(X,z):
     alpha=z[1,0]
     theta=X[2,0]
     o=alpha+theta
+    #normalize
     on=atan2(sin(o),cos(o))
     x=X[0,0]+z[0,0]*cos(on)
     y=X[1,0]+z[0,0]*sin(on)
@@ -22,9 +23,9 @@ def getLandmark(X,z):
 if __name__ == '__main__':
     vpm=kf.VelocityProcessModel()
     vpm.dt=1
-    X=np.matrix([0,0,0]).T
+    X=np.matrix([0.0,0.0,0.0]).T
     u=np.matrix([1.0,0.11]).T
-    lmm=kf.LandmarksMeasurementModel()
+    lmm=kf.LandmarkMeasurementModel()
     map=[]
     #map.append(np.array([10,10]))
     map.append(np.array([ 0,10]))
@@ -41,11 +42,11 @@ if __name__ == '__main__':
     ly=[y for x,y in map]
     print x,y
     plt.plot(lx, ly, 'ro')
-    STEPS=50
+    STEPS=6
     for i in range(STEPS):
         print "At:"
         print X
-        cp.plot_cov_ellipse(cov, X[:2,:], nstd=3, alpha=0.5, color='orange')
+        cp.plot_cov_ellipse(cov, X[:2,:].copy(), nstd=3, alpha=0.5, color='orange')
         X=vpm.eval(X,u)
     #ax = plt.gca()
     #ax.set_autoscale_on(True)
@@ -65,19 +66,19 @@ if __name__ == '__main__':
     for j in range(STEPS):
         X,Xcov=kalman.predict(u)
         cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.2, color='green')
-        for j in range(2):
+        print "det=",np.linalg.det(Xcov)
+        for j in range(1):
             print "det=",np.linalg.det(Xcov)
             #r=np.random.randint(0,100)
             #if r<80:
             #    continue
-            if np.linalg.det(Xcov)<0.002:
-                continue
+            #if np.linalg.det(Xcov)<0.002:
+            #    continue
             i=np.random.randint(0,len(map))
             lmm.setC(i)#observe landmark 0
             zd=lmm.eval(X)
             #z=zd
             z=np.matrix(np.array([zd[0,0]+np.random.randn(1)[0]*0.01525,zd[1,0]+np.random.randn(1)[0]*0.01525,0])).T
-            x,y=getLandmark(X,z)
             x,y=getLandmark(X,z)
             plt.plot([x], [y], 'b*')
             plt.plot([x,X[0,0]],[y,X[1,0]],"g",alpha=0.2)
@@ -85,7 +86,7 @@ if __name__ == '__main__':
             cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.5, color='blue')
             kalman.X_=X
             kalman.Xcov_=Xcov
-        cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.5, color='red')
+        #cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.5, color='red')
         kalman.X=X
         kalman.Xcov=Xcov
     plt.show()

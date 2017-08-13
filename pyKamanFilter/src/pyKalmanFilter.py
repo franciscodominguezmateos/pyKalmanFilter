@@ -23,28 +23,40 @@ class VelocityProcessModel(object):
         y=X[1,0]
         theta=X[2,0]
         dt=self.getDeltaTime()
-        dX0=-vw*sin(theta)+vw*sin(theta+wt*dt)
-        dX1= vw*cos(theta)-vw*cos(theta+wt*dt)
-        dX2=wt*dt
-        dX=np.matrix(np.array(
-                     [[dX0],
-                      [dX1],
-                      [dX2]]))
-        return X+dX
+        a=theta+wt*dt
+        #Normalize angle
+        alpha=atan2(sin(a),cos(a))
+        dX0=-vw*sin(theta)+vw*sin(alpha)
+        dX1= vw*cos(theta)-vw*cos(alpha)
+        dX2= wt*dt #must be normalized, done with alpha
+        #dX=np.matrix(np.array(
+        #             [[dX0],
+        #              [dX1],
+        #              [dX2]]))
+        X[0,0]=X[0,0]+dX0
+        X[1,0]+=dX1
+        #a=+wt*dt
+        #Normalize angle
+        #alpha=atan2(sin(a),cos(a))       
+        X[2,0]=alpha
+        return X
     def jacobian(self,X,u):
         vt=u[0,0]
         wt=u[1,0]
         vw=vt/wt
         theta=X[2,0]
         dt=self.getDeltaTime()
-        g02=-vw*cos(theta)+vw*cos(theta+wt*dt)
-        g12=-vw*sin(theta)+vw*sin(theta+wt*dt)
+        a=theta+wt*dt
+        #Normalize angle
+        alpha=atan2(sin(a),cos(a))
+        g02=-vw*cos(theta)+vw*cos(alpha)
+        g12=-vw*sin(theta)+vw*sin(alpha)
         G=np.matrix(np.array(
-                     [[1, 0, g02],
-                     [0, 1, g12],
-                     [0, 0,   1]]))
+                     [[1.0, 0.0, g02],
+                     [ 0.0, 1.0, g12],
+                     [ 0.0, 0.0,   1.0]]))
         return G
-class LandmarksMeasurementModel(object):
+class LandmarkMeasurementModel(object):
     def __init__(self):
         self.m=[] #map is a list
         self.C=0 # correspondence problem dependent variable
@@ -66,8 +78,8 @@ class LandmarksMeasurementModel(object):
         d2=dx2+dy2
         d =sqrt(d2) #distance from object/robot to landmark
         th=atan2(dy,dx)-theta #angle from object/robot to landmark
-        #Normalize angle
-        pass
+         #Normalize angle
+        thn=atan2(sin(th),cos(th))
         Z_=np.matrix(np.array(
                      [[ d],
                       [th],
@@ -91,6 +103,46 @@ class LandmarksMeasurementModel(object):
                     [[-dx/d ,-dy/d , 0],
                      [ dy/d2,-dx/d2,-1],
                      [     0,     0, 0]]))
+        return H
+class LineMeasurementModel(object):
+    def __init__(self):
+        self.m=[] #map is a list
+        self.C=0 # correspondence problem dependent variable
+    def setC(self,C):
+        self.C=C
+    def getDim(self):
+        return 2
+    def eval(self,X):
+        j=self.C
+        mjr=self.m[j][0]#radious of landmark
+        mja=self.m[j][1]#angle   of landmark
+        x=X[0,0]
+        y=X[1,0]
+        theta=X[2,0]
+        d =mjr-(x*cos(mja)+y*sin(mja)) #distance from object/robot to line landmark
+        th=mja-theta #angle from object/robot to line landmark 
+         #Normalize angle
+        thn=atan2(sin(th),cos(th))
+        Z_=np.matrix(np.array(
+                     [[ d],
+                      [th]]))
+        return Z_
+    def jacobian(self,X):
+        j=self.C
+        mjx=self.m[j][0]
+        mjy=self.m[j][1]
+        x=X[0,0]
+        y=X[1,0]
+        theta=X[2,0]
+        dx=mjx-x
+        dy=mjy-y
+        dx2=dx*dx
+        dy2=dy*dy
+        d2=dx2+dy2
+        d =sqrt(d2)#distance from measure to landmark
+        H=np.matrix(np.array(
+                    [[ -cos(mja),-sin(mja),  0.0],
+                     [      0.0 ,    0.0 , -1.0]]))
         return H
     
 class pyUnscentedKalmanFilter(object):
@@ -128,8 +180,8 @@ class pyUnscentedKalmanFilter(object):
         self.Innov=Zini # Innovation
         self.setParameters()
         self.setWeights(Xdim)
-    def setParameters(self,a=1,b=2,k=0.1):
-        n=self.Xcov.shape[1]+1
+    def setParameters(self,a=0.3,b=2.0,k=0.1):
+        n=self.Xcov.shape[1]
         # alpha
         self.a=a
         # beta
@@ -140,21 +192,21 @@ class pyUnscentedKalmanFilter(object):
         self.l=a*a*(n+k)-n
     def getSigmaPoints(self,mean,covIn):
         cols=covIn.shape[1]
-        n=cols+1
+        n=cols
         sigmaPts=[]
         # first sigma point is the mean
+        sigmaPts.append(mean.copy())
+        # sqrt of a matrix is cholesky decomposition
         tmp=(n+self.l)*covIn
         cov=np.linalg.cholesky(tmp)
-        sigmaPts.append(mean)
         for i in range(cols):
             c=cov[:,i]
-            print "c=",c
             sigma=mean+c
             sigmaPts.append(sigma)
             sigma=mean-c
             sigmaPts.append(sigma)
-        for sp in sigmaPts:
-            print sp
+        #for sp in sigmaPts:
+        #    print sp
         return sigmaPts
     def setWeights(self,n):
         self.wm=[]
@@ -166,12 +218,14 @@ class pyUnscentedKalmanFilter(object):
         wm0=l/(n+l)
         self.wm.append(wm0)
         # weight for covariance
-        wc0=l/(n+l)+1-a*a+b
+        wc0=l/(n+l)+1.0-a*a+b
         self.wc.append(wc0)
+        w=1.0/(2.0*(n+l))
         for i in range(2*n):
-            w=1/(2*(n+l))
             self.wm.append(w)
             self.wc.append(w)
+        print "wm=",self.wm
+        print "wc=",self.wc
     def projectProcessModel(self,sigmaPts,U):
         sigmaPts_=[]
         for s in sigmaPts:
@@ -189,13 +243,11 @@ class pyUnscentedKalmanFilter(object):
         # mean estimation
         M_=np.matrix(np.zeros(dim)).T
         for w,s in zip(self.wm,sigmaPts_):
-            print s
             M_+=w*s
         # covariance estimation
         cov_=noiseCov
         for w,s in zip(self.wc,sigmaPts_):
             cov_+=w*(s-M_)*(s-M_).T
-        print M_,cov_
         return M_,cov_
     def getCrossCov(self,XsigmaPts,X_,ZsigmaPts,Z_):
         dimX=X_.shape[0]
@@ -203,12 +255,8 @@ class pyUnscentedKalmanFilter(object):
         cov=np.matrix(np.zeros((dimX,dimZ)))
         print cov.shape
         for w,x,z in zip(self.wc,XsigmaPts,ZsigmaPts):
-            print x.shape
-            print z.T.shape
             dX=x-X_
             dZ=z-Z_
-            print dX.shape
-            print dZ.T.shape
             cov+=w*dX*dZ.T
         return cov
     def predict(self,U=np.matrix('0,0,0,0').T):
