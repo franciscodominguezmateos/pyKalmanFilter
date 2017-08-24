@@ -42,7 +42,7 @@ if __name__ == '__main__':
     ly=[y for x,y in map]
     print x,y
     plt.plot(lx, ly, 'ro')
-    STEPS=6
+    STEPS=25
     for i in range(STEPS):
         print "At:"
         print X
@@ -72,8 +72,8 @@ if __name__ == '__main__':
             #r=np.random.randint(0,100)
             #if r<80:
             #    continue
-            #if np.linalg.det(Xcov)<0.002:
-            #    continue
+            if np.linalg.det(Xcov)<0.002:
+                continue
             i=np.random.randint(0,len(map))
             lmm.setC(i)#observe landmark 0
             zd=lmm.eval(X)

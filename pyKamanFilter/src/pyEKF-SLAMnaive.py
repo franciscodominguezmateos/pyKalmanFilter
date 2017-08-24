@@ -63,7 +63,7 @@ class VelocityProcessSLAMModel(object):
         Gr=np.matrix(np.eye(self.dim))
         Gr[:3,:3]=G
         return Gr
-class LandmarksMeasurementSLAMModel(object):
+class LandmarkMeasurementSLAMModel(object):
     def __init__(self):
         self.C=0 # correspondence problem dependent variable
     def setC(self,C):
@@ -91,7 +91,7 @@ class LandmarksMeasurementSLAMModel(object):
         thn=atan2(sin(th),cos(th))
         Z_=np.matrix(np.array(
                      [[ d],
-                      [th]]))
+                      [thn]]))
         return Z_
     
     def jacobian(self,X):
@@ -118,6 +118,55 @@ class LandmarksMeasurementSLAMModel(object):
         Hm=np.matrix(np.array(
                     [[ dx/d , dy/d ],
                      [-dy/d2, dx/d2]]))
+        H=np.matrix(np.zeros((2,self.dim)))
+        H[:, :3  ]=Hx
+        H[:,j:j+2]=Hm
+        return H
+    
+class LineMeasurementSLAMModel(object):
+    def __init__(self):
+        self.C=0 # correspondence problem dependent variable
+    def setC(self,C):
+        self.C=C
+    def getDim(self):
+        return self.dim
+    def eval(self,X):
+        #State dimension can change
+        self.dim=X.shape[0]
+        j=self.C*2+3
+        #Map is in the state X
+        mjr=X[j  ,0]#x landmark pos
+        mja=X[j+1,0]#y landmark pos
+        x=X[0,0]
+        y=X[1,0]
+        theta=X[2,0]
+        d =mjr-(x*cos(mja)+y*sin(mja)) #distance from object/robot to line landmark
+        th=mja-theta #angle from object/robot to line landmark 
+         #Normalize angle
+        thn=atan2(sin(th),cos(th))
+        Z_=np.matrix(np.array(
+                     [[ d],
+                      [thn]]))
+        return Z_
+     
+    def jacobian(self,X):
+        #State dimension can change
+        self.dim=X.shape[0]
+        j=self.C*2+3
+        #Map is in the state X
+        mjr=X[j  ,0]#x landmark pos
+        mja=X[j+1,0]#y landmark pos
+        x=X[0,0]
+        y=X[1,0]
+        theta=X[2,0]
+        #Jacobian with respect to X
+        Hx=np.matrix(np.array(
+                    [[ -cos(mja),-sin(mja),  0.0],
+                     [      0.0 ,     0.0 , -1.0]]))
+        #Jacobian with respect to m=landmark j 
+        Hm=np.matrix(np.array(
+                    [[  1.0 , x*sin(mja)-y*cos(mja) ],
+                     [  0.0 ,                  1.0  ]]))
         H=np.matrix(np.zeros((2,self.dim)))
         H[:, :3  ]=Hx
         H[:,j:j+2]=Hm
@@ -188,7 +237,7 @@ if __name__ == '__main__':
     X=np.matrix(np.vstack((np.matrix([0,0,0]).T,amap)),np.float)
     u=np.matrix([1.0,0.12]).T
     #Masurement model
-    lmm=LandmarksMeasurementSLAMModel()
+    lmm=LandmarkMeasurementSLAMModel()
     lmm.dim=DIM
     #Identity and zeros matrices
     eye  =np.matrix(np.eye(DIM))
