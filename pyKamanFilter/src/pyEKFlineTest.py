@@ -47,9 +47,9 @@ def plotLine(z,color="r"):
         x1=np.sign(c)*10
         y1=-10
     else:
-        x0=10
+        x0=20
         y0=-a/b*x0+c/b
-        x1=-10
+        x1=-20
         y1=-a/b*x1+c/b
 #     else:
 #         if a<1e-5:
@@ -72,12 +72,17 @@ if __name__ == '__main__':
     lmm=kf.LineMeasurementModel()
     map=[]
     #map.append(np.array([ 10, 0.0]))
-    map.append(np.array([ 10, PI/2.0]))
+    #map.append(np.array([ 10, PI/2.0]))
     #map.append(np.array([ 10, PI]))
-    map.append(np.array([ 10,-PI/2.0]))
-    map.append(np.array([ 10, PI/4.0]))
-    map.append(np.array([ 10, PI*3.0/8.0]))
+    #map.append(np.array([ 10,-PI/2.0]))
+    #map.append(np.array([ 10, PI/4.0]))
+    #map.append(np.array([ 10, PI*3.0/8.0]))
     #map.append(np.array([ -10, PI*1.0/8.0]))
+    map.append(np.array([ -20, PI/4]))
+    map.append(np.array([  20, PI/4]))
+    map.append(np.array([ -20, PI/2+PI/4]))
+    map.append(np.array([  20, PI/2+PI/4]))
+    
     lmm.m=map
     cov=np.array([[  8.87790565,   4.65839419],
                   [  4.65839419,  12.01291835]]) #[[0.4, 9],[9, 10]])
@@ -114,7 +119,7 @@ if __name__ == '__main__':
             #r=np.random.randint(0,100)
             #if r<80:
             #    continue
-            if np.linalg.det(Xcov)<0.002:
+            if np.linalg.det(Xcov)<0.05:
                 continue
             i=np.random.randint(0,len(map))
             #i=j

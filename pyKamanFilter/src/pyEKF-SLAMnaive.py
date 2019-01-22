@@ -215,12 +215,10 @@ def getMeasurement(X,m):
 if __name__ == '__main__':
     #Build a map
     map=[]
-    map.append(np.array([10,10]))
-    map.append(np.array([ 0,10]))
-    map.append(np.array([10, 0.0]))
-    map.append(np.array([-15, 0.0]))
-    map.append(np.array([ 0,-5]))
-    map.append(np.array([ 15,15]))
+    map.append(np.array([ 10, 10]))
+    map.append(np.array([-10, 10]))
+    map.append(np.array([-10,-10]))
+    map.append(np.array([ 10,-10]))
     amap=np.matrix(np.array(map).ravel()).T
     #Draw the map
     lx=[x for x,y in map]
@@ -243,7 +241,7 @@ if __name__ == '__main__':
     eye  =np.matrix(np.eye(DIM))
     zeros=np.matrix(np.zeros((DIM,DIM)))
     cov=eye
-    STEPS=60
+    STEPS=15
     for i in range(30):
         #print "At:"
         #print X[:2,:]
@@ -256,7 +254,7 @@ if __name__ == '__main__':
     #X=np.matrix(np.zeros((DIM,1)))
     Xini=X.copy()
     kalman.X=X
-    kalman.Xcov  = eye * 10# INF
+    kalman.Xcov  = eye * INF
     Xc=0.00015
     kalman.Xcov[0,0]=Xc
     kalman.Xcov[1,1]=Xc
@@ -269,14 +267,14 @@ if __name__ == '__main__':
     #kalman.Zcov = np.matrix(np.array([[1,0,0],
     #                                   [0,1,0],
     #                                   [0,0,1]],np.float32) * 0.0525)
-    ZN=0.0225
+    ZN=0.00225
     kalman.ZNcov = np.matrix(np.array([[1,0],
                                        [0,1]],np.float32) * ZN)
     for j in range(STEPS):
         X,Xcov=kalman.predict(u)
         cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.2, color='green')
         for k in range(1):#samples for step
-            print np.linalg.det(Xcov[:3,:3])
+            #print np.linalg.det(Xcov[:3,:3])
             #if np.linalg.det(Xcov[:3,:3])<0.0000001:
             #    continue
             i=np.random.randint(0,len(map))
@@ -290,7 +288,7 @@ if __name__ == '__main__':
             plt.plot([x,X[0,0]],[y,X[1,0]],"g",alpha=0.2)
             lmm.setC(i)#observe landmark i
             X,Xcov=kalman.update(z)
-            #print X[3:,0],(Xini-X)[3:,0]
+            print X[:3,0]
             cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.1, color='blue')
             kalman.X_=X
             kalman.Xcov_=Xcov
