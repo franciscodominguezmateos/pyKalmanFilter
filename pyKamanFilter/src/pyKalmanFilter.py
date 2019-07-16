@@ -98,7 +98,7 @@ class LandmarkMeasurementModel(object):
         dx2=dx*dx
         dy2=dy*dy
         d2=dx2+dy2
-        d =sqrt(d2)#distance from measure to landmark
+        d =sqrt(d2)#distance from object/robot  to landmark
         H=np.matrix(np.array(
                     [[-dx/d ,-dy/d , 0],
                      [ dy/d2,-dx/d2,-1],
@@ -406,7 +406,7 @@ class pyExtendedKalmanFilter(object):
         # Update State
         correction=K*Innov
         X    =X_+correction
-        Xcov =Xcov_-K*Zcov*K.T
+        Xcov =Xcov_-K*ZTran*Xcov_
         # set data
         self.Z_=Z_
         self.Zcov=Zcov
@@ -507,7 +507,7 @@ class pyKalmanFilter(object):
         K    = Xcov_*ZTran.T*iZcov
         # Update State
         X    =X_+K*Innov
-        Xcov =Xcov_-K*Zcov*K.T
+        Xcov =Xcov_-K*ZTran*Xcov_
         # set data
         self.Z_=Z_
         self.Zcov=Zcov

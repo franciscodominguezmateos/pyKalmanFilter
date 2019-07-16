@@ -209,7 +209,7 @@ def getMeasurement(X,m):
     thn=atan2(sin(th),cos(th))
     Z_=np.matrix(np.array(
                  [[ d],
-                  [th]]))
+                  [thn]]))
     return Z_ 
     
 if __name__ == '__main__':
@@ -256,29 +256,27 @@ if __name__ == '__main__':
     #X=np.matrix(np.zeros((DIM,1)))
     Xini=X.copy()
     kalman.X=X
-    kalman.Xcov  = eye * 10# INF
-    Xc=0.00015
+    kalman.Xcov  = eye * 100# INF
+    Xc=0.01**2
     kalman.Xcov[0,0]=Xc
     kalman.Xcov[1,1]=Xc
     kalman.Xcov[2,2]=Xc
     kalman.XNcov = zeros
-    XN=0.0002525
+    XN=0.02**2
     kalman.XNcov[0,0]=XN
     kalman.XNcov[1,1]=XN
     kalman.XNcov[2,2]=XN
-    #kalman.Zcov = np.matrix(np.array([[1,0,0],
-    #                                   [0,1,0],
-    #                                   [0,0,1]],np.float32) * 0.0525)
-    ZN=0.0225
+    ZN=0.5**2
     kalman.ZNcov = np.matrix(np.array([[1,0],
                                        [0,1]],np.float32) * ZN)
     for j in range(STEPS):
         X,Xcov=kalman.predict(u)
         cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.2, color='green')
+        #plotCovMap(X,Xcov)
         for k in range(1):#samples for step
             print np.linalg.det(Xcov[:3,:3])
-            #if np.linalg.det(Xcov[:3,:3])<0.0000001:
-            #    continue
+            if np.linalg.det(Xcov[:3,:3])<1e-8:
+                continue
             i=np.random.randint(0,len(map))
             #simulate measurement
             m=np.matrix(map[i]).T
@@ -294,9 +292,8 @@ if __name__ == '__main__':
             cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.1, color='blue')
             kalman.X_=X
             kalman.Xcov_=Xcov
-        cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.5, color='red')
+        #cp.plot_cov_ellipse(Xcov[:2,:2].copy(), X[:2,:].copy(), nstd=3, alpha=0.5, color='red')
         kalman.X=X
         kalman.Xcov=Xcov
-        plotMap(X)
     plotCovMap(X,Xcov)
     plt.show()
